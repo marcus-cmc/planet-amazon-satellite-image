@@ -108,9 +108,9 @@ class PlanetAmazonCNN(object):
     def add_dense_block(self, units):
         for unit in units:
             self.add_dense(unit)
+            if self.norm_dense:
+                self.add_batch_norm()
             self.add_dropout(self.drop_dense)
-        if self.norm_dense:
-            self.add_batch_norm()
 
     def add_conv2d(self, filter_size, kernel_size=(3, 3)):
         self.stack = Conv2D(filter_size, kernel_size=kernel_size,
@@ -220,6 +220,7 @@ class PlanetAmazonCNN(object):
 
     def load_prev_model(self, epoch):
         pass
+        # to do:
         # self.model = load_model('hdf5')
         # history = dict(pd.read_csv("./Model_history.csv"))
         # for k, v in history.items():
@@ -238,10 +239,6 @@ class PlanetAmazonCNN(object):
         X_val, Y_val = self.validation_data
         Y_val_pred = self.model.predict(X_val)
         return find_thresholds(Y_val, Y_val_pred)
-
-    # def _bin_by_thresholds(self):
-    #     return bin_by_thresholds(self.Y_pred, self.thresholds)
-    #     # self.Y_pred_label = bin_by_thresholds(self.Y_pred, self.thresholds)
 
     def save_results(self, savename=""):
         self.save_summary(savename)
