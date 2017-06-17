@@ -152,6 +152,7 @@ class PlanetAmazonCNN(object):
 
     def fit_generator(self, data_df, batch_size=64, steps_per_epoch=None,
                       validation_data=None, epochs=1, **kwargs):
+        # to do: make find_thresholds optional
         self.batch_size = batch_size
         self.train_data = data_df
         self.validation_data = self._format_validation_data(validation_data)

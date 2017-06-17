@@ -30,12 +30,24 @@ N_LABELS = len(LABEL_NAMES)
 #             "test": "./data/test-jpg/",
 #             "file": "./data/test-jpg-additional/"}
 
+"""
+main directory/
+    util_func.py
+    planet_amazon_clf.py
+    batch_img_gen.py
+    data/
+        train-jpg/
+        test-jpg/
+        test-jpg-additional/
+    logs/
+"""
 IMG_PATH = {"train": os.path.join(os.getcwd(), "data", "train-jpg"),
             "test": os.path.join(os.getcwd(), "data", "test-jpg"),
             "file": os.path.join(os.getcwd(), "data", "test-jpg-additional")}
 
 
 def load_image(img_name, pixel_per_side=None):
+    """ load and resize (if needed) images from disk"""
     path = IMG_PATH[img_name.split("_")[0]]
     img_file = os.path.join(path, img_name + ".jpg")
     img = skimage.io.imread(img_file)
@@ -46,6 +58,10 @@ def load_image(img_name, pixel_per_side=None):
 
 
 def encode_tags(tags):
+    """
+    encode tags from an image into a binary list according to LABEL_MAPPING.
+    length: N_LABELS, the first 4 are clouds, and the rest 13 are common labels
+    """
     res = [0] * N_LABELS
     for name in tags.split(" "):
         res[LABEL_MAPPING[name]] = 1
@@ -53,14 +69,29 @@ def encode_tags(tags):
 
 
 def decode_tags(encoded):
+    """decode a binary array/list into the desired output format"""
     return " ".join(LABEL_NAMES[i] for i, val in enumerate(encoded) if val)
 
 
 def get_imgs_and_labels(data_df, pixel_per_side=None):
+    """
+    get both images and labels from data_df
+    data_df must be (a slice) from "train_v2.csv" from kaggle
+    (no labels for test data)
+    """
     return get_imgs(data_df, pixel_per_side), get_labels(data_df)
 
 
 def get_imgs(data_df, pixel_per_side=None):
+    """
+    get images as a numpy array
+    aarguments:
+        data_df: a DataFrame from "train_v2.csv" or "sample_submission_v2.csv"
+                 from kaggle (or a slice of it)
+        pixel_per_side: the size of returned image, (if None, no resizing)
+    return:
+        a np array of shape : (len(data_df), pixel_per_side, pixel_per_side, 3)
+    """
     pix = pixel_per_side if pixel_per_side is not None else 256
     X = np.zeros((len(data_df), pix, pix, 3), dtype=np.float32)
     for i, img_name in enumerate(data_df.image_name.values):
@@ -69,6 +100,14 @@ def get_imgs(data_df, pixel_per_side=None):
 
 
 def get_labels(data_df):
+    """
+    get labels of images as a numpy array
+    aarguments:
+        data_df: a DataFrame from "train_v2.csv" or "sample_submission_v2.csv"
+                 from kaggle (or a slice of it)
+    return:
+        a np array of shape: (len(data_df), N_LABELS)
+    """
     Y = np.zeros((len(data_df), N_LABELS), dtype=np.uint8)
     for i, tags in enumerate(data_df.tags.values):
         Y[i] = encode_tags(tags)
@@ -76,6 +115,12 @@ def get_labels(data_df):
 
 
 def bin_clouds(Y_pred):
+    """
+    binarize the prediction for clouds labels, only used in PlanetAmazonCNN2
+    argument:
+        Y_pred: a np array from the prediction results from PlanetAmazonCNN2
+                shape: (n_samples, N_LABELS)
+    """
     Y_label = np.copy(Y_pred)
     cloud_max = np.amax(Y_pred[:, :N_CLOUDS], axis=1)
     Y_label[:, :N_CLOUDS] = (
@@ -85,6 +130,14 @@ def bin_clouds(Y_pred):
 
 
 def bin_by_thresholds(Y_pred, thresholds, softmax_clouds=False):
+    """
+    binarize the prediction according to the given thresholds
+    argument:
+        Y_pred: a np array from the prediction results
+        thresholds: an iterable of length N_LABELS
+        softmax_clouds: False for PlanetAmazonCNN; True for PlanetAmazonCNN2
+    returns: a np array of shape (n_samples, N_LABELS)
+    """
     if softmax_clouds:
         Y_label, start_idx = bin_clouds(Y_pred), N_CLOUDS
     else:
@@ -98,6 +151,18 @@ def bin_by_thresholds(Y_pred, thresholds, softmax_clouds=False):
 
 def find_thresholds(actual, Y_pred, softmax_clouds=False, base=0.2,
                     print_f=True, th_range=np.arange(0.03, 0.501, 0.001)):
+    """
+    use actual data to find the thresholds for each label for a given model
+    arguments:
+        actual: actual labels, a (n_samples, N_LABELS) binary np array
+                could be from training or validation data
+        Y_pred: predicted label, a (n_samples, N_LABELS) np array (floats)
+        base: a float between 0 and 1 used to binarize the prediction initially
+        th_range: thresold candidates to try, an iterable
+                  each element is between 0 and 1
+    return:
+        best thresholds according to this input, a (N_LABELS, ) np array
+    """
     if softmax_clouds:
         Y_label, start_idx = bin_clouds(Y_pred), N_CLOUDS
         Y_label[:, N_CLOUDS:] = (Y_pred[:, N_CLOUDS:] >= base)
@@ -124,9 +189,11 @@ def find_thresholds(actual, Y_pred, softmax_clouds=False, base=0.2,
     return np.array(thresholds)
 
 
-def decode_and_save(data_test_df, Y_pred, savename=""):
+def decode_and_save(data_test_df, Y_label, savename=""):
+    """save the predited labels as the desired format for submission"""
     df = pd.DataFrame()
     df["image_name"] = data_test_df.image_name
-    df["tags"] = [decode_tags(tags) for tags in Y_pred]
+    df["tags"] = [decode_tags(tags) for tags in Y_label]
     df.to_csv(savename + "_prediction.csv", index=False)
+
     return df
