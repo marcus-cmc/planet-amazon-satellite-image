@@ -1,0 +1,132 @@
+# -*- coding: utf-8 -*-
+# @Author: marcus
+
+from __future__ import absolute_import
+from __future__ import division
+from __future__ import print_function
+
+import os
+import numpy as np
+import pandas as pd
+import skimage.io
+import skimage.transform
+from sklearn.metrics import fbeta_score
+
+
+LABEL_CLOUDS = ['cloudy', 'partly_cloudy', 'haze', 'clear']
+LABEL_COMMON = [
+    'agriculture', 'artisinal_mine', 'bare_ground', 'blooming', 'blow_down',
+    'conventional_mine', 'cultivation', 'habitation', 'primary', 'road',
+    'selective_logging', 'slash_burn', 'water']
+
+LABEL_NAMES = LABEL_CLOUDS + LABEL_COMMON
+LABEL_MAPPING = {tag: i for i, tag in enumerate(LABEL_NAMES)}
+
+N_CLOUDS = len(LABEL_CLOUDS)
+N_COMMON = len(LABEL_COMMON)
+N_LABELS = len(LABEL_NAMES)
+
+# IMG_PATH = {"train": "./data/train-jpg/",
+#             "test": "./data/test-jpg/",
+#             "file": "./data/test-jpg-additional/"}
+
+IMG_PATH = {"train": os.path.join(os.getcwd(), "data", "train-jpg"),
+            "test": os.path.join(os.getcwd(), "data", "test-jpg"),
+            "file": os.path.join(os.getcwd(), "data", "test-jpg-additional")}
+
+
+def load_image(img_name, pixel_per_side=None):
+    path = IMG_PATH[img_name.split("_")[0]]
+    img_file = os.path.join(path, img_name + ".jpg")
+    img = skimage.io.imread(img_file)
+    if pixel_per_side is not None:
+        img = skimage.transform.resize(img, (pixel_per_side, pixel_per_side),
+                                       preserve_range=True, mode='constant')
+    return img / 255.0  # np-array, shape (256, 256, 3)
+
+
+def encode_tags(tags):
+    res = [0] * N_LABELS
+    for name in tags.split(" "):
+        res[LABEL_MAPPING[name]] = 1
+    return res
+
+
+def decode_tags(encoded):
+    return " ".join(LABEL_NAMES[i] for i, val in enumerate(encoded) if val)
+
+
+def get_imgs_and_labels(data_df, pixel_per_side=None):
+    return get_imgs(data_df, pixel_per_side), get_labels(data_df)
+
+
+def get_imgs(data_df, pixel_per_side=None):
+    pix = pixel_per_side if pixel_per_side is not None else 256
+    X = np.zeros((len(data_df), pix, pix, 3), dtype=np.float32)
+    for i, img_name in enumerate(data_df.image_name.values):
+        X[i] = load_image(img_name, pixel_per_side)
+    return X
+
+
+def get_labels(data_df):
+    Y = np.zeros((len(data_df), N_LABELS), dtype=np.uint8)
+    for i, tags in enumerate(data_df.tags.values):
+        Y[i] = encode_tags(tags)
+    return Y
+
+
+def bin_clouds(Y_pred):
+    Y_label = np.copy(Y_pred)
+    cloud_max = np.amax(Y_pred[:, :N_CLOUDS], axis=1)
+    Y_label[:, :N_CLOUDS] = (
+        np.where(Y_pred[:, :N_CLOUDS] == cloud_max[:, None], 1, 0))
+
+    return Y_label
+
+
+def bin_by_thresholds(Y_pred, thresholds, softmax_clouds=False):
+    if softmax_clouds:
+        Y_label, start_idx = bin_clouds(Y_pred), N_CLOUDS
+    else:
+        Y_label, start_idx = np.copy(Y_pred), 0
+
+    for i in range(start_idx, N_LABELS):
+        Y_label[:, i] = 1 * (Y_pred[:, i] >= thresholds[i])
+
+    return Y_label
+
+
+def find_thresholds(actual, Y_pred, softmax_clouds=False, base=0.2,
+                    print_f=True, th_range=np.arange(0.03, 0.501, 0.001)):
+    if softmax_clouds:
+        Y_label, start_idx = bin_clouds(Y_pred), N_CLOUDS
+        Y_label[:, N_CLOUDS:] = (Y_pred[:, N_CLOUDS:] >= base)
+        thresholds = [1] * N_CLOUDS  # pad with 1
+    else:
+        Y_label, start_idx = Y_pred >= base, 0
+        thresholds = []
+
+    f_max = 0
+    for i in range(start_idx, N_LABELS):
+        score = []
+        for j, th in enumerate(th_range):
+            Y_label[:, i] = Y_pred[:, i] >= th
+            score.append(fbeta_score(actual, Y_label, beta=2,
+                         average='samples'))
+        f_max = max(f_max, max(score))
+        best_th = th_range[np.argmax(score)]
+        thresholds.append(best_th)
+        Y_label[:, i] = Y_label[:, i] >= best_th
+
+    if print_f:
+        print("best_f2score: {}".format(f_max))
+
+    return np.array(thresholds)
+
+
+def decode_and_save(data_test_df, Y_pred, savename=""):
+    df = pd.DataFrame()
+    df["image_name"] = data_test_df.image_name
+    df["tags"] = [decode_tags(tags) for tags in Y_pred]
+    df.to_csv(savename + "_prediction.csv", index=False)
+    return df
