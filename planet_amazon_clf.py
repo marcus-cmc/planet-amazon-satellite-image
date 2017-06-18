@@ -7,6 +7,7 @@ from __future__ import print_function
 
 import os
 import sys
+import glob
 import numpy as np
 import pandas as pd
 import collections
@@ -78,9 +79,9 @@ class PlanetAmazonCNN(object):
         self.compile_model()
 
     def make_default_model(self):
-        self.add_conv2d_block((32, 32))
-        self.add_conv2d_block((64, 64))
-        self.add_conv2d_block((128, 128))
+        self.add_conv2d_block((32, 64))
+        self.add_conv2d_block((64, 128))
+        self.add_conv2d_block((128, 256))
         self.add_conv2d_block((256, 256))
         self.flatten()
         self.add_dense_block((256,))
@@ -221,13 +222,6 @@ class PlanetAmazonCNN(object):
 
     def load_prev_model(self, epoch):
         pass
-        # to do:
-        # self.model = load_model('hdf5')
-        # history = dict(pd.read_csv("./Model_history.csv"))
-        # for k, v in history.items():
-        #     if k != "epoch":
-        #         self.history[k] = list(v)
-        # self.epoch = epoch+1
 
     def _bin_Y_pred(self):
         if self.validation_data is not None:
@@ -276,11 +270,6 @@ class PlanetAmazonCNN(object):
         df_prob = pd.DataFrame(self.Y_pred, columns=LABEL_NAMES)
         df_prob.index.name = self.test_data_iter.df.image_name
         df_prob.to_csv(prefix + "_probability.csv")
-        # df_prob = pd.DataFrame()
-        # df_prob["image_name"] = self.test_data_iter.df.image_name
-        # for i in range(N_LABELS):
-        #     df_prob["probability_" + str(i)] = self.Y_pred[:, i]
-        # df_prob.to_csv(prefix + "_probability.csv", index=False)
 
         return decode_and_save(self.test_data_iter.df, self.Y_pred_label,
                                prefix)
