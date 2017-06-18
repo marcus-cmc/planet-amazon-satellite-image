@@ -16,6 +16,12 @@ class BatchImgGen(object):
     Can be called infinite number of times.
     """
     def __init__(self, data, batch_size=64, pixel=None, aug_times=0):
+        """
+        aug_times:
+            num of batches of augmented images (in addition to original image)
+            to generate. if aug_times = 2 and batch_size=64, then each batch
+            would have 192 images (64 original, 128 augmented)
+        """
         self.df = data  # a pd dataframe
         self.idx = np.arange(len(data))
         self.curr_idx = 0
@@ -48,7 +54,7 @@ class BatchImgGen(object):
             Y[i] = self._get_label(index)
             self._update_curr_idx()
 
-        if self.aug_times:  # image augmentation
+        if self.aug_times:   # image augmentation
             X_orig, Y_orig = X[:self.batch_size], Y[:self.batch_size]
             keras_aug = ImageDataGenerator(
                 horizontal_flip=True, vertical_flip=True,
