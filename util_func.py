@@ -162,6 +162,7 @@ def find_thresholds(actual, Y_pred, softmax_clouds=False, base=0.2,
                   each element is between 0 and 1
     return:
         best thresholds according to this input, a (N_LABELS, ) np array
+        Y_label
     """
     if softmax_clouds:
         Y_label, start_idx = bin_clouds(Y_pred), N_CLOUDS
@@ -176,6 +177,8 @@ def find_thresholds(actual, Y_pred, softmax_clouds=False, base=0.2,
         score = []
         for j, th in enumerate(th_range):
             Y_label[:, i] = Y_pred[:, i] >= th
+            # could try k-fold validation and choose the mean
+            # actual[:n//k], actual[n//k:2*n//k]... 
             score.append(fbeta_score(actual, Y_label, beta=2,
                          average='samples'))
         f_max = max(f_max, max(score))
@@ -186,7 +189,7 @@ def find_thresholds(actual, Y_pred, softmax_clouds=False, base=0.2,
     if print_f:
         print("best_f2score: {}".format(f_max))
 
-    return np.array(thresholds)
+    return np.array(thresholds), 1*Y_label
 
 
 def decode_and_save(data_test_df, Y_label, savename=""):

@@ -40,15 +40,16 @@ class PlanetAmazonCNN(object):
         self.drop_pooling = drop_pooling
         self.history = collections.defaultdict(list)
         self.norm_input = norm_input
-        self.norm_conv = norm_conv
-        self.norm_pooling = norm_pooling
-        self.norm_dense = norm_dense
         self.input_layer = Input(shape=(pixel, pixel, CHANNELS))
         self.stack = self.input_layer  # layer stack
         if norm_input:
             self.add_batch_norm()
         self.path = self._path()
         self.callbacks = [self._add_checkpoint()] if callbacks else []
+        # the following only affect "add_conv2d_block" and "add_dense_block"
+        self.norm_conv = norm_conv
+        self.norm_pooling = norm_pooling
+        self.norm_dense = norm_dense
 
     def _add_checkpoint(self):
         fpath = ("ep{epoch:02d}_loss{val_loss:.3f}_" +
@@ -238,7 +239,22 @@ class PlanetAmazonCNN(object):
     def _find_thresholds(self):
         X_val, Y_val = self.validation_data
         Y_val_pred = self.model.predict(X_val)
-        return find_thresholds(Y_val, Y_val_pred)
+        thresholds, Y_val_pred_label = find_thresholds(Y_val, Y_val_pred)
+        self._save_valid_pred(Y_val_pred, Y_val_pred_label)
+        return thresholds
+
+    def _save_valid_pred(self, Y_val_pred, Y_val_pred_label):
+        prefix = "val_pred_ep{:02d}".format(self.epoch-1)
+        prefix = os.path.join(self.path, prefix)
+        df_label = pd.DataFrame(Y_val_pred_label, columns=LABEL_NAMES)
+        df_pred = pd.DataFrame(Y_val_pred, columns=LABEL_NAMES)
+        df_pred.to_csv(prefix + "_probability.csv")
+        df_label.to_csv(prefix + "_label.csv")
+        return
+
+    def save_valid_df(self, df_validation):
+        df_validation.to_csv(os.path.join(self.path, "validation_label.csv"),
+                             index=False)
 
     def save_results(self, savename=""):
         self.save_summary(savename)
@@ -257,12 +273,14 @@ class PlanetAmazonCNN(object):
             df.to_csv(prefix + "_thresholds.csv", index=False)
         except AttributeError:
             pass
-
-        df_prob = pd.DataFrame()
-        df_prob["label_name"] = self.test_data_iter.df.image_name
-        for i in range(N_LABELS):
-            df_prob["probability_" + str(i)] = self.Y_pred[:, i]
-        df_prob.to_csv(prefix + "_probability.csv", index=False)
+        df_prob = pd.DataFrame(self.Y_pred, columns=LABEL_NAMES)
+        df_prob.index.name = self.test_data_iter.df.image_name
+        df_prob.to_csv(prefix + "_probability.csv")
+        # df_prob = pd.DataFrame()
+        # df_prob["image_name"] = self.test_data_iter.df.image_name
+        # for i in range(N_LABELS):
+        #     df_prob["probability_" + str(i)] = self.Y_pred[:, i]
+        # df_prob.to_csv(prefix + "_probability.csv", index=False)
 
         return decode_and_save(self.test_data_iter.df, self.Y_pred_label,
                                prefix)
@@ -344,10 +362,14 @@ class PlanetAmazonCNN2(PlanetAmazonCNN):
                                  softmax_clouds=True)
 
     def _find_thresholds(self):
-        X_valid, Y_valid = self.validation_data
-        Y_valid = np.concatenate((Y_valid["cloud_output"],
-                                  Y_valid["common_output"]),
-                                 axis=1)
-        Y_valid_pred = self.predict(X_valid)
+        X_val, Y_val = self.validation_data
+        Y_val = np.concatenate((Y_val["cloud_output"],
+                                Y_val["common_output"]), axis=1)
+        Y_val_pred = self.predict(X_val)
 
-        return find_thresholds(Y_valid, Y_valid_pred, softmax_clouds=True)
+        thresholds, Y_val_pred_label = find_thresholds(Y_val, Y_val_pred)
+        self._save_valid_pred(Y_val_pred, Y_val_pred_label)
+        return thresholds
+
+        # return find_thresholds(Y_val, Y_val_pred, softmax_clouds=True)
+
