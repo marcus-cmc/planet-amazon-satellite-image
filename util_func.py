@@ -92,7 +92,8 @@ def get_imgs(data_df, pixel_per_side=None):
     return:
         a np array of shape : (len(data_df), pixel_per_side, pixel_per_side, 3)
     """
-    pix = pixel_per_side if pixel_per_side is not None else 256
+    pix = pixel_per_side or 256
+    # pix = pixel_per_side if pixel_per_side is not None else 256
     X = np.zeros((len(data_df), pix, pix, 3), dtype=np.float32)
     for i, img_name in enumerate(data_df.image_name.values):
         X[i] = load_image(img_name, pixel_per_side)
@@ -129,7 +130,7 @@ def bin_clouds(Y_pred):
     return Y_label
 
 
-def bin_by_thresholds(Y_pred, thresholds, softmax_clouds=False):
+def bin_by_thresholds(Y_pred, thresholds=None, softmax_clouds=False):
     """
     binarize the prediction according to the given thresholds
     argument:
@@ -142,6 +143,8 @@ def bin_by_thresholds(Y_pred, thresholds, softmax_clouds=False):
         Y_label, start_idx = bin_clouds(Y_pred), N_CLOUDS
     else:
         Y_label, start_idx = np.copy(Y_pred), 0
+
+    thresholds = thresholds or np.array([0.175] * N_LABELS)  # base
 
     for i in range(start_idx, N_LABELS):
         Y_label[:, i] = 1 * (Y_pred[:, i] >= thresholds[i])
@@ -188,7 +191,6 @@ def find_thresholds(actual, Y_pred, softmax_clouds=False, base=0.175,
         print("best_f2score: {}".format(f_max))
 
     return np.array(thresholds), 1*Y_label
-
 
 
 def decode_and_save(data_test_df, Y_label, savename=""):
