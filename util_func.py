@@ -144,7 +144,8 @@ def bin_by_thresholds(Y_pred, thresholds=None, softmax_clouds=False):
     else:
         Y_label, start_idx = np.copy(Y_pred), 0
 
-    thresholds = thresholds or np.array([0.175] * N_LABELS)  # base
+    if thresholds is None:
+        thresholds = np.array([0.175] * N_LABELS)
 
     for i in range(start_idx, N_LABELS):
         Y_label[:, i] = 1 * (Y_pred[:, i] >= thresholds[i])
