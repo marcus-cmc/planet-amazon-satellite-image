@@ -42,9 +42,9 @@ class PlanetAmazonCNN(object):
         self.history = collections.defaultdict(list)
         self.norm_input = norm_input
         self.input_layer = Input(shape=(pixel, pixel, CHANNELS))
-        self.stack = self.input_layer  # layer stack
+        self.stack = self.input_layer
         if norm_input:
-            self.add_batch_norm()
+            self.stack = self.add_batch_norm(self.stack)
         self.path = self._path()
         self.callbacks = [self._add_checkpoint()] if callbacks else []
         # the following only affect "add_conv2d_block" and "add_dense_block"
@@ -70,26 +70,23 @@ class PlanetAmazonCNN(object):
             os.makedirs(path)
         return path
 
-    def make_debug_model(self):
-        self.add_conv2d_block((4, 4))
-        self.add_conv2d_block((8,))
-        self.flatten()
-        self.add_dense_block((8,))
-        self.add_output()
-        self.compile_model()
+    def _make_default_CNN(self):
+        L = self.stack
+        L = self.add_conv2d_block(L, (32, 64))
+        L = self.add_conv2d_block(L, (64, 128))
+        L = self.add_conv2d_block(L, (128, 256))
+        L = self.add_conv2d_block(L, (256, 256))
+        L = self.flatten(L)
+        return L
 
     def make_default_model(self):
-        self.add_conv2d_block((32, 64))
-        self.add_conv2d_block((64, 128))
-        self.add_conv2d_block((128, 256))
-        self.add_conv2d_block((256, 256))
-        self.flatten()
-        self.add_dense_block((256,))
-        self.add_output()
+        flat = self._make_default_CNN()
+        L = self.add_dense_block(flat, (128,))
+        self.add_output(L)
         self.compile_model()
 
     def compile_model(self):
-        self.model = Model(inputs=self.input_layer, outputs=self.stack)
+        self.model = Model(inputs=self.input_layer, outputs=self.output_layer)
         self.model.compile(optimizer=self.optimizer,
                            loss="binary_crossentropy",
                            metrics=["accuracy"])
@@ -97,46 +94,50 @@ class PlanetAmazonCNN(object):
     def get_model(self):
         return self.model
 
-    def add_conv2d_block(self, filters):
+    def add_conv2d_block(self, L, filters):
         for filter_size in filters:
-            self.add_conv2d(filter_size)
+            L = self.add_conv2d(L, filter_size)
             if self.norm_conv:
-                self.add_batch_norm()
-        self.add_pooling()
+                L = self.add_batch_norm(L)
+        L = self.add_pooling(L)
         if self.norm_pooling:
-            self.add_batch_norm()
-        self.add_dropout(self.drop_pooling)
+            L = self.add_batch_norm(L)
+        L = self.add_dropout(L, self.drop_pooling)
 
-    def add_dense_block(self, units):
+        return L
+
+    def add_dense_block(self, L, units):
         for unit in units:
-            self.add_dense(unit)
+            L = self.add_dense(L, unit)
             if self.norm_dense:
-                self.add_batch_norm()
-            self.add_dropout(self.drop_dense)
+                L = self.add_batch_norm(L)
+            L = self.add_dropout(L, self.drop_dense)
+        return L
 
-    def add_conv2d(self, filter_size, kernel_size=(3, 3)):
-        self.stack = Conv2D(filter_size, kernel_size=kernel_size,
-                            activation="relu", padding='same',
-                            data_format="channels_last")(self.stack)
+    def add_conv2d(self, L, filter_size, kernel_size=(3, 3)):
+        return Conv2D(filter_size, kernel_size=kernel_size,
+                      activation="relu", padding='same',
+                      data_format="channels_last")(L)
 
-    def add_pooling(self, pool_size=(2, 2), drop_pooling=None):
-        self.stack = MaxPooling2D(pool_size=pool_size,
-                                  data_format="channels_last")(self.stack)
+    def add_pooling(self, L, pool_size=(2, 2), drop_pooling=None):
+        return MaxPooling2D(pool_size=pool_size,
+                            data_format="channels_last")(L)
 
-    def add_dense(self, units):
-        self.stack = Dense(units, activation="relu")(self.stack)
+    def add_dense(self, L, units):
+        return Dense(units, activation="relu")(L)
 
-    def add_dropout(self, rate):
-        self.stack = Dropout(rate=rate)(self.stack)
+    def add_dropout(self, L, rate):
+        return Dropout(rate=rate)(L)
 
-    def flatten(self):
-        self.stack = Flatten()(self.stack)
+    def flatten(self, L):
+        return Flatten()(L)
 
-    def add_batch_norm(self):
-        self.stack = BatchNormalization()(self.stack)
+    def add_batch_norm(self, L):
+        return BatchNormalization()(L)
 
-    def add_output(self):
-        self.stack = Dense(units=N_LABELS, activation="sigmoid")(self.stack)
+    def add_output(self, L):
+        self.output_layer = Dense(units=N_LABELS, activation="sigmoid")(L)
+        return self.output_layer
 
     def get_learning_rate(self):
         return K.eval(self.model.optimizer.lr)
@@ -162,8 +163,15 @@ class PlanetAmazonCNN(object):
         self._fit_generator(epochs=epochs, **kwargs)
 
     def fit(self, *args, **kwargs):
+        epochs = kwargs.get('epochs', 1)
+        kwargs['epochs'] = epochs + self.epochs
+        kwargs['initial_epoch'] = self.epoch
+        kwargs['callbacks'] = self.callbacks
         h = self.model.fit(*args, **kwargs)
+        self.epoch += epochs
         self._update_history(h)
+        if self.validation_data is not None:
+            self.thresholds = self._find_thresholds()
         return h
 
     def _fit_generator(self, epochs, steps_per_epoch=None, **kwargs):
@@ -306,6 +314,13 @@ class PlanetAmazonCNN2(PlanetAmazonCNN):
                                save_best_only=True, save_weights_only=False,
                                verbose=0, period=1)
 
+    def make_default_model(self):
+        flat = self._make_default_CNN()
+        L_clouds = self.add_dense_block(flat, (64,))
+        L_common = self.add_dense_block(flat, (128,))
+        self.add_output(L_clouds, L_common)
+        self.compile_model()
+
     def compile_model(self):
         self.model = Model(inputs=self.input_layer,
                            outputs=[self.output_cloud, self.output_common])
@@ -316,12 +331,12 @@ class PlanetAmazonCNN2(PlanetAmazonCNN):
                            metrics=["accuracy"])
         return
 
-    def add_output(self):
+    def add_output(self, L_clouds, L_common):
         self.output_cloud = Dense(units=N_CLOUDS, activation="softmax",
-                                  name="cloud_output")(self.stack)
+                                  name="cloud_output")(L_clouds)
 
         self.output_common = Dense(units=N_COMMON, activation="sigmoid",
-                                   name="common_output")(self.stack)
+                                   name="common_output")(L_common)
         return
 
     def get_train_data_gen(self):
