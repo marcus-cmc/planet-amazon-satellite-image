@@ -27,9 +27,9 @@ CHANNELS = 3
 
 class PlanetAmazonCNN(object):
     def __init__(self, modelname, pixel, aug_times=0, optimizer=None,
-                 drop_dense=0.3, drop_pooling=0.3,
+                 callbacks=True, drop_dense=0.3, drop_pooling=0.3,
                  norm_input=True, norm_conv=True,
-                 norm_pooling=True, norm_dense=True, callbacks=True):
+                 norm_pooling=True, norm_dense=True):
 
         self.modelname = modelname
         self.pixel = pixel
@@ -168,7 +168,6 @@ class PlanetAmazonCNN(object):
 
     def _fit_generator(self, epochs, steps_per_epoch=None, **kwargs):
         if steps_per_epoch is None:
-            # steps_per_epoch = len(self.train_data) // self.batch_size
             steps_per_epoch = self.train_data_gen.get_steps()
         h = self.model.fit_generator(self.train_data_gen,
                                      steps_per_epoch=steps_per_epoch,
@@ -227,8 +226,8 @@ class PlanetAmazonCNN(object):
         if self.validation_data is not None:
             self.thresholds = self._find_thresholds()
             return bin_by_thresholds(self.Y_pred, self.thresholds)
-        # base 0.2 thresholds
-        return bin_by_thresholds(self.Y_pred, np.array([0.2] * N_LABELS))
+
+        return bin_by_thresholds(self.Y_pred)
 
     def _find_thresholds(self):
         X_val, Y_val = self.validation_data
@@ -347,8 +346,7 @@ class PlanetAmazonCNN2(PlanetAmazonCNN):
             return bin_by_thresholds(self.Y_pred, self.thresholds,
                                      softmax_clouds=True)
 
-        return bin_by_thresholds(self.Y_pred, np.array([0.2] * N_LABELS),
-                                 softmax_clouds=True)
+        return bin_by_thresholds(self.Y_pred, softmax_clouds=True)
 
     def _find_thresholds(self):
         X_val, Y_val = self.validation_data
@@ -356,9 +354,8 @@ class PlanetAmazonCNN2(PlanetAmazonCNN):
                                 Y_val["common_output"]), axis=1)
         Y_val_pred = self.predict(X_val)
 
-        thresholds, Y_val_pred_label = find_thresholds(Y_val, Y_val_pred)
+        thresholds, Y_val_pred_label = find_thresholds(Y_val, Y_val_pred,
+                                                       softmax_clouds=True)
         self._save_valid_pred(Y_val_pred, Y_val_pred_label)
+
         return thresholds
-
-        # return find_thresholds(Y_val, Y_val_pred, softmax_clouds=True)
-
