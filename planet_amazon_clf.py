@@ -91,9 +91,6 @@ class PlanetAmazonCNN(object):
                            loss="binary_crossentropy",
                            metrics=["accuracy"])
 
-    def get_model(self):
-        return self.model
-
     def add_conv2d_block(self, L, filters):
         for filter_size in filters:
             L = self.add_conv2d(L, filter_size)
@@ -119,7 +116,7 @@ class PlanetAmazonCNN(object):
                       activation="relu", padding='same',
                       data_format="channels_last")(L)
 
-    def add_pooling(self, L, pool_size=(2, 2), drop_pooling=None):
+    def add_pooling(self, L, pool_size=(2, 2)):
         return MaxPooling2D(pool_size=pool_size,
                             data_format="channels_last")(L)
 
@@ -127,7 +124,7 @@ class PlanetAmazonCNN(object):
         return Dense(units, activation="relu")(L)
 
     def add_dropout(self, L, rate):
-        return Dropout(rate=rate)(L)
+        return Dropout(rate=rate)(L) if rate else L
 
     def flatten(self, L):
         return Flatten()(L)
@@ -213,11 +210,9 @@ class PlanetAmazonCNN(object):
                                                             verbose=0)
         self.Y_pred = Y_pred
         self.Y_pred_label = self._bin_Y_pred()
+        self.save_results()
 
         return self.Y_pred
-
-    def history(self):
-        return self.history
 
     def _update_history(self, h):
         for k in h.history:
@@ -237,11 +232,21 @@ class PlanetAmazonCNN(object):
 
         return bin_by_thresholds(self.Y_pred)
 
+    def _save_thresholds(self, thresholds):
+        prefix = "val_pred_ep{:02d}".format(self.epoch-1)
+        prefix = os.path.join(self.path, prefix)
+        df = pd.DataFrame()
+        df["label_name"] = LABEL_NAMES
+        df["thresholds"] = thresholds
+        df.to_csv(prefix + "_thresholds.csv", index=False)
+        return
+
     def _find_thresholds(self):
         X_val, Y_val = self.validation_data
         Y_val_pred = self.model.predict(X_val)
         thresholds, Y_val_pred_label = find_thresholds(Y_val, Y_val_pred)
         self._save_valid_pred(Y_val_pred, Y_val_pred_label)
+        self._save_thresholds(thresholds)
         return thresholds
 
     def _save_valid_pred(self, Y_val_pred, Y_val_pred_label):
@@ -267,13 +272,6 @@ class PlanetAmazonCNN(object):
 
         prefix = os.path.join(self.path, prefix)
 
-        try:
-            df = pd.DataFrame()
-            df["label_name"] = LABEL_NAMES
-            df["thresholds"] = self.thresholds
-            df.to_csv(prefix + "_thresholds.csv", index=False)
-        except AttributeError:
-            pass
         df_prob = pd.DataFrame(self.Y_pred, columns=LABEL_NAMES)
         df_prob.index.name = self.test_data_iter.df.image_name
         df_prob.to_csv(prefix + "_probability.csv")
@@ -284,7 +282,7 @@ class PlanetAmazonCNN(object):
     def save_summary(self, fname=""):
         """ workaround to save model.summary() to a .txt file"""
         original_stdout = sys.stdout
-        fname = os.path.join(self.path, fname+"summary.txt")
+        fname = os.path.join(self.path, fname + "summary.txt")
 
         with open(fname, 'w') as file:
             sys.stdout = file
@@ -372,5 +370,6 @@ class PlanetAmazonCNN2(PlanetAmazonCNN):
         thresholds, Y_val_pred_label = find_thresholds(Y_val, Y_val_pred,
                                                        softmax_clouds=True)
         self._save_valid_pred(Y_val_pred, Y_val_pred_label)
+        self._save_thresholds(thresholds)
 
         return thresholds
