@@ -193,42 +193,6 @@ def find_thresholds(actual, Y_pred, softmax_clouds=False, base=0.175,
 
     return np.array(thresholds), 1 * Y_label
 
-def find_thresholds2(actual, Y_pred, softmax_clouds=False, base=0.175, k=3,
-                     print_f=True, th_range=np.arange(0.03, 0.501, 0.001)):
-
-    if softmax_clouds:
-        Y_label, start_idx = bin_clouds(Y_pred), N_CLOUDS
-        Y_label[:, N_CLOUDS:] = (Y_pred[:, N_CLOUDS:] >= base)
-        thresholds = [1] * N_CLOUDS  # pad with 1
-    else:
-        Y_label, start_idx = Y_pred >= base, 0
-        thresholds = []
-
-    f_max = 0
-    n = len(Y_pred)
-    for fold in range(k):
-        th_fold = [1] * N_CLOUDS if softmax_clouds else []
-        lo, hi = fold * n // k, (fold+1) * n // k
-        for i in range(start_idx, N_LABELS):
-            score = []
-            for j, th in enumerate(th_range):
-                Y_label[lo:hi, i] = Y_pred[lo:hi, i] >= th
-                score.append(fbeta_score(actual[lo:hi], Y_label[lo:hi], beta=2,
-                                         average='samples'))
-            f_max = max(f_max, max(score))
-            best_th = th_range[np.argmax(score)]
-            th_fold.append(best_th)
-            Y_label[lo:hi, i] = Y_pred[lo:hi, i] >= best_th
-        thresholds.append(th_fold)
-    thresholds = np.mean(thresholds, axis=0)
-
-    Y_label = np.where(Y_pred >= thresholds, 1, 0)
-    best_f = fbeta_score(actual, Y_label, beta=2, average='samples')
-
-    if print_f:
-        print("best_f2score: {}".format(best_f))
-
-    return np.array(thresholds), 1*Y_label
 
 def decode_and_save(data_test_df, Y_label, savename=""):
     """save the predited labels as the desired format for submission"""
