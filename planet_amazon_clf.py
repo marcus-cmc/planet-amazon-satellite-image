@@ -72,9 +72,9 @@ class PlanetAmazonCNN(object):
 
     def _make_default_CNN(self):
         L = self.stack
-        L = self.add_conv2d_block(L, (32, 64))
-        L = self.add_conv2d_block(L, (64, 128))
-        L = self.add_conv2d_block(L, (128, 256))
+        L = self.add_conv2d_block(L, (32, 32))
+        L = self.add_conv2d_block(L, (64, 64))
+        L = self.add_conv2d_block(L, (128, 128))
         L = self.add_conv2d_block(L, (256, 256))
         L = self.flatten(L)
         return L
@@ -143,7 +143,7 @@ class PlanetAmazonCNN(object):
         K.set_value(self.optimizer.lr, learning_rate)
         return
 
-    def get_train_data_gen(self):
+    def _create_train_data_gen(self):
         return BatchImgGen(data=self.train_data, batch_size=self.batch_size,
                            pixel=self.pixel, aug_times=self.aug_times)
 
@@ -156,7 +156,7 @@ class PlanetAmazonCNN(object):
         self.batch_size = batch_size
         self.train_data = data_df
         self.validation_data = self._format_validation_data(validation_data)
-        self.train_data_gen = self.get_train_data_gen()
+        self.train_data_gen = self._create_train_data_gen()
         self._fit_generator(epochs=epochs, **kwargs)
 
     def fit(self, *args, **kwargs):
