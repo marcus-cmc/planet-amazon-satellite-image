@@ -44,7 +44,7 @@ class BatchImgGen(object):
         return self.__next__()
 
     def _get_batch(self):
-        pix = self.pixel if self.pixel is not None else 256
+        pix = self.pixel or 256
         n_imgs = self.batch_size * (1 + self.aug_times)
         X = np.zeros((n_imgs, pix, pix, 3), dtype=np.float32)
         Y = np.zeros((n_imgs, N_LABELS), dtype=np.uint8)
@@ -95,7 +95,7 @@ class TestImgIter(BatchImgGen):
     def _get_batch(self):
         if self.curr_idx == len(self.df):
             raise StopIteration
-        pix = self.pixel if self.pixel is not None else 256
+        pix = self.pixel or 256
         n_samples = min(self.batch_size, len(self.df) - self.curr_idx)
         X = np.zeros((n_samples, pix, pix, 3), dtype=np.float32)
         for i in range(n_samples):
