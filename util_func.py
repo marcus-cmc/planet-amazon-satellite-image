@@ -51,10 +51,11 @@ def load_image(img_name, pixel_per_side=None):
     path = IMG_PATH[img_name.split("_")[0]]
     img_file = os.path.join(path, img_name + ".jpg")
     img = skimage.io.imread(img_file)
-    if pixel_per_side is not None:
+    pixel_per_side = pixel_per_side or 256
+    if pixel_per_side != 256:
         img = skimage.transform.resize(img, (pixel_per_side, pixel_per_side),
                                        preserve_range=True, mode='constant')
-    return img / 255.0  # np-array, shape (256, 256, 3)
+    return img / 255.0  # np-array, shape (pixel_per_side, pixel_per_side, 3)
 
 
 def encode_tags(tags):
@@ -93,7 +94,6 @@ def get_imgs(data_df, pixel_per_side=None):
         a np array of shape : (len(data_df), pixel_per_side, pixel_per_side, 3)
     """
     pix = pixel_per_side or 256
-    # pix = pixel_per_side if pixel_per_side is not None else 256
     X = np.zeros((len(data_df), pix, pix, 3), dtype=np.float32)
     for i, img_name in enumerate(data_df.image_name.values):
         X[i] = load_image(img_name, pixel_per_side)
