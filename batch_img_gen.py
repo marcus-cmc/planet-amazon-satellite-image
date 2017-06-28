@@ -61,10 +61,10 @@ class BatchImgGen(object):
             if self.aug_params is None:
                 self.aug_params = {
                     "data_format": "channels_last", "fill_mode": 'reflect',
-                    "horizontal_flip": False, "vertical_flip": False,
+                    "horizontal_flip": True, "vertical_flip": True,
                     "rotation_range": 25.0, "channel_shift_range": 0.02,
-                    "width_shift_range": 0.3, "height_shift_range": 0.3,
-                    "zoom_range": 0.15}
+                    "width_shift_range": 0.15, "height_shift_range": 0.15,
+                    "zoom_range": 0.1}
             keras_aug = ImageDataGenerator(**self.aug_params)
             aug = keras_aug.flow(X_orig, Y_orig, batch_size=self.batch_size)
             for aug_batch in range(1, 1+self.aug_times):
