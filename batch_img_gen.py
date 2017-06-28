@@ -15,7 +15,8 @@ class BatchImgGen(object):
     A custom batch image data / label generator.
     Can be called infinite number of times.
     """
-    def __init__(self, data, batch_size=64, pixel=None, aug_times=0):
+    def __init__(self, data, batch_size=64, pixel=None,
+                 aug_times=0, aug_params=None):
         """
         aug_times:
             num of batches of augmented images (in addition to original image)
@@ -29,6 +30,7 @@ class BatchImgGen(object):
         self.pixel = pixel
         self.steps = self._cal_steps()
         self.aug_times = aug_times  # 0: no image augumentation
+        self.aug_params = aug_params
 
     def get_steps(self):
         return self.steps
@@ -56,11 +58,14 @@ class BatchImgGen(object):
 
         if self.aug_times:   # image augmentation
             X_orig, Y_orig = X[:self.batch_size], Y[:self.batch_size]
-            keras_aug = ImageDataGenerator(
-                horizontal_flip=True, vertical_flip=True,
-                rotation_range=15.0, channel_shift_range=0.05,
-                fill_mode='nearest', data_format="channels_last")
-
+            if self.aug_params is None:
+                self.aug_params = {
+                    "data_format": "channels_last", "fill_mode": 'reflect',
+                    "horizontal_flip": False, "vertical_flip": False,
+                    "rotation_range": 25.0, "channel_shift_range": 0.02,
+                    "width_shift_range": 0.3, "height_shift_range": 0.3,
+                    "zoom_range": 0.15}
+            keras_aug = ImageDataGenerator(**self.aug_params)
             aug = keras_aug.flow(X_orig, Y_orig, batch_size=self.batch_size)
             for aug_batch in range(1, 1+self.aug_times):
                 aug_x, aug_y = next(aug)

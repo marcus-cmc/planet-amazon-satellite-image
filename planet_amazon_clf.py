@@ -26,14 +26,16 @@ CHANNELS = 3
 
 
 class PlanetAmazonCNN(object):
-    def __init__(self, modelname, pixel, aug_times=0, optimizer=None,
+    def __init__(self, modelname, pixel, optimizer=None,
                  callbacks=True, drop_dense=0.3, drop_pooling=0.3,
                  norm_input=True, norm_conv=True,
-                 norm_pooling=True, norm_dense=True):
+                 norm_pooling=True, norm_dense=True,
+                 aug_times=0, aug_params=None):
 
         self.modelname = modelname
         self.pixel = pixel
         self.aug_times = aug_times
+        self.aug_params = aug_params
         self.epoch = 0
         if optimizer is None:
             self.optimizer = optimizers.Adam()
@@ -72,10 +74,11 @@ class PlanetAmazonCNN(object):
 
     def _make_default_CNN(self):
         L = self.stack
-        L = self.add_conv2d_block(L, (32, 32))
-        L = self.add_conv2d_block(L, (64, 64))
-        L = self.add_conv2d_block(L, (128, 128))
+        L = self.add_conv2d_block(L, (32, 64))
+        L = self.add_conv2d_block(L, (64, 128))
+        L = self.add_conv2d_block(L, (128, 256))
         L = self.add_conv2d_block(L, (256, 256))
+
         L = self.flatten(L)
         return L
 
@@ -145,7 +148,8 @@ class PlanetAmazonCNN(object):
 
     def _create_train_data_gen(self):
         return BatchImgGen(data=self.train_data, batch_size=self.batch_size,
-                           pixel=self.pixel, aug_times=self.aug_times)
+                           pixel=self.pixel, aug_times=self.aug_times,
+                           aug_params=self.aug_params)
 
     def _format_validation_data(self, validation_data):
         return validation_data
@@ -339,7 +343,8 @@ class PlanetAmazonCNN2(PlanetAmazonCNN):
 
     def get_train_data_gen(self):
         return BatchImgGen2(data=self.train_data, batch_size=self.batch_size,
-                            pixel=self.pixel, aug_times=self.aug_times)
+                            pixel=self.pixel, aug_times=self.aug_times,
+                            aug_params=self.aug_params)
 
     def _format_validation_data(self, validation_data):
         if validation_data is not None:
