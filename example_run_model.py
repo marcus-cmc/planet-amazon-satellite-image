@@ -23,7 +23,6 @@ clf = PlanetAmazonCNN("Exanple_model", PIX,
                       norm_conv=False, aug_times=2)
 
 clf.make_default_model()
-clf.compile_model()
 clf.model.summary()
 
 clf.fit_generator(df_train, batch_size=64, epochs=8,
