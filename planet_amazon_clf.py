@@ -76,8 +76,8 @@ class PlanetAmazonCNN(object):
         L = self.stack
         L = self.add_conv2d_block(L, (32, 64))
         L = self.add_conv2d_block(L, (64, 128))
-        L = self.add_conv2d_block(L, (128, 256))
-        L = self.add_conv2d_block(L, (256, 256))
+        L = self.add_conv2d_block(L, (128, 128))
+        L = self.add_conv2d_block(L, (128, 128, 256))
 
         L = self.flatten(L)
         return L
@@ -109,9 +109,9 @@ class PlanetAmazonCNN(object):
     def add_dense_block(self, L, units):
         for unit in units:
             L = self.add_dense(L, unit)
+            L = self.add_dropout(L, self.drop_dense)
             if self.norm_dense:
                 L = self.add_batch_norm(L)
-            L = self.add_dropout(L, self.drop_dense)
         return L
 
     def add_conv2d(self, L, filter_size, kernel_size=(3, 3)):
