@@ -277,7 +277,7 @@ class PlanetAmazonCNN(object):
         prefix = os.path.join(self.path, prefix)
 
         df_prob = pd.DataFrame(self.Y_pred, columns=LABEL_NAMES)
-        df_prob.index.name = self.test_data_iter.df.image_name
+        df_prob.index = self.test_data_iter.df.image_name
         df_prob.to_csv(prefix + "_probability.csv")
 
         return decode_and_save(self.test_data_iter.df, self.Y_pred_label,
