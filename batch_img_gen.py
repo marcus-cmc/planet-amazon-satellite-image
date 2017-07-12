@@ -30,7 +30,14 @@ class BatchImgGen(object):
         self.pixel = pixel
         self.steps = self._cal_steps()
         self.aug_times = aug_times  # 0: no image augumentation
-        self.aug_params = aug_params
+        if aug_times:
+            self.aug_gen = self.get_aug_generator(aug_params)
+
+    def __next__(self):
+        return self._get_batch()
+
+    def next(self):
+        return self.__next__()
 
     def get_steps(self):
         return self.steps
@@ -38,12 +45,6 @@ class BatchImgGen(object):
     def _cal_steps(self):
         steps, remain = divmod(len(self.df), self.batch_size)
         return steps + (remain != 0) * 1
-
-    def __next__(self):
-        return self._get_batch()
-
-    def next(self):
-        return self.__next__()
 
     def _get_batch(self):
         pix = self.pixel or 256
@@ -58,15 +59,7 @@ class BatchImgGen(object):
 
         if self.aug_times:   # image augmentation
             X_orig, Y_orig = X[:self.batch_size], Y[:self.batch_size]
-            if self.aug_params is None:
-                self.aug_params = {
-                    "data_format": "channels_last", "fill_mode": 'reflect',
-                    "horizontal_flip": True, "vertical_flip": True,
-                    "rotation_range": 25.0, "channel_shift_range": 0.02,
-                    "width_shift_range": 0.15, "height_shift_range": 0.15,
-                    "zoom_range": 0.1}
-            keras_aug = ImageDataGenerator(**self.aug_params)
-            aug = keras_aug.flow(X_orig, Y_orig, batch_size=self.batch_size)
+            aug = self.aug_gen.flow(X_orig, Y_orig, batch_size=self.batch_size)
             for aug_batch in range(1, 1+self.aug_times):
                 aug_x, aug_y = next(aug)
                 lo = aug_batch * self.batch_size
@@ -74,6 +67,17 @@ class BatchImgGen(object):
                 Y[lo:lo+self.batch_size] = aug_y
 
         return X, Y
+
+    def get_aug_generator(self, aug_params):
+        if aug_params is None:
+            aug_params = {
+                "data_format": "channels_last", "fill_mode": 'reflect',
+                "horizontal_flip": True, "vertical_flip": True,
+                "rotation_range": 25.0, "channel_shift_range": 0.02,
+                "width_shift_range": 0.15, "height_shift_range": 0.15,
+                "zoom_range": 0.1}
+
+        return ImageDataGenerator(**aug_params)
 
     def _get_img(self, index):
         return load_image(self.df.image_name.values[index], self.pixel)
