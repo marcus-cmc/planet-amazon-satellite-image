@@ -1,7 +1,7 @@
 # planet-amazon-satellite-image
 Convolutional Neural Network for multiclass and multilabel classification (Kaggle's competition)
-- multi-class (4 class for "cloud condition"): each image only have 1 cloud condition
-- milti-label (9 labels about human footprint): each image can have 0 - 9 labels
+- **multi-class** (4 class for "cloud condition"): each image only have 1 cloud condition
+- **multi-label** (9 labels about human footprint): each image can have 0 - 9 labels
 
 ## Content
 - `batch_img_gen.py`: A custom batch image data/label generator with options to perform image augmentation. It can be called infinite number of times for model training.
@@ -9,6 +9,7 @@ Convolutional Neural Network for multiclass and multilabel classification (Kaggl
 
 
 ## Example architectures:
+- These are some example architectures with some shared layers and different output layers.
 ![Example](example_model_architecture2.png)
 
 ![Example1](example_model_architecture1.png)
